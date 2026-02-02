@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 財務助手</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">
+                🤖 AI 財務助手
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="active">📊 儀表板</a></li>
+                <li><a href="/analysis">📈 技術分析</a></li>
+                <li><a href="/portfolio">💼 投資組合</a></li>
+                <li><a href="/risk">⚠️ 風險分析</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 市場摘要 -->
+        <section style="margin-bottom: 2rem;">
+            <h2 style="margin-bottom: 1rem; font-size: 1.5rem;">🌍 市場概覽</h2>
+            <div class="grid grid-4">
+                {% for name, data in market_summary.items() %}
+                <div class="market-card fade-in">
+                    <div class="market-name">{{ name }}</div>
+                    {% if data.error is not defined %}
+                    <div class="market-price">{{ "{:,.2f}".format(data.price) }}</div>
+                    <div class="market-change {{ 'positive' if data.change_pct >= 0 else 'negative' }}">
+                        {{ "▲" if data.change_pct >= 0 else "▼" }}
+                        {{ "{:+.2f}".format(data.change) }} ({{ "{:+.2f}".format(data.change_pct) }}%)
+                    </div>
+                    {% else %}
+                    <div class="market-price">--</div>
+                    <div class="market-change">無法取得資料</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- 投資組合摘要 -->
+        <section style="margin-bottom: 2rem;">
+            <h2 style="margin-bottom: 1rem; font-size: 1.5rem;">💰 投資組合摘要</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">總成本</div>
+                    <div class="stat-value">${{ "{:,.2f}".format(total_cost) }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">總市值</div>
+                    <div class="stat-value">${{ "{:,.2f}".format(total_value) }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">總損益</div>
+                    <div class="stat-value {{ 'positive' if total_profit >= 0 else 'negative' }}">
+                        {{ "+" if total_profit >= 0 else "" }}${{ "{:,.2f}".format(total_profit) }}
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">報酬率</div>
+                    <div class="stat-value {{ 'positive' if total_profit_pct >= 0 else 'negative' }}">
+                        {{ "{:+.2f}".format(total_profit_pct) }}%
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 持股列表 -->
+        <section>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📋 持股明細</h3>
+                    <button class="btn btn-primary" onclick="openAddModal()">
+                        ➕ 新增持股
+                    </button>
+                </div>
+
+                {% if portfolio %}
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>股票</th>
+                                <th>股數</th>
+                                <th>均價</th>
+                                <th>現價</th>
+                                <th>成本</th>
+                                <th>市值</th>
+                                <th>損益</th>
+                                <th>報酬率</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in portfolio %}
+                            <tr class="fade-in">
+                                <td>
+                                    <div style="font-weight: 600;">{{ item.symbol }}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ item.name }}</div>
+                                </td>
+                                <td>{{ "{:,.2f}".format(item.shares) }}</td>
+                                <td>${{ "{:,.2f}".format(item.avg_cost) }}</td>
+                                <td>${{ "{:,.2f}".format(item.current_price) }}</td>
+                                <td>${{ "{:,.2f}".format(item.cost) }}</td>
+                                <td>${{ "{:,.2f}".format(item.value) }}</td>
+                                <td class="{{ 'positive' if item.profit >= 0 else 'negative' }}"
+                                    style="font-weight: 600;">
+                                    {{ "+" if item.profit >= 0 else "" }}${{ "{:,.2f}".format(item.profit) }}
+                                </td>
+                                <td>
+                                    <span
+                                        class="badge {{ 'badge-success' if item.profit_pct >= 0 else 'badge-danger' }}">
+                                        {{ "{:+.2f}".format(item.profit_pct) }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="/analysis?symbol={{ item.symbol }}" class="btn btn-outline btn-sm">分析</a>
+                                    <button class="btn btn-danger btn-sm"
+                                        onclick="deleteHolding({{ item.id }})">刪除</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                    <p>尚無持股資料，點擊「新增持股」開始追蹤您的投資組合</p>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <!-- 新增持股 Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>➕ 新增持股</h3>
+                <button class="modal-close" onclick="closeAddModal()">&times;</button>
+            </div>
+            <form id="addForm" onsubmit="addHolding(event)">
+                <div class="form-group">
+                    <label class="form-label">股票代碼</label>
+                    <input type="text" class="form-input" id="symbol" placeholder="例如: AAPL 或 2330.TW" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">股數</label>
+                    <input type="number" class="form-input" id="shares" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">平均成本</label>
+                    <input type="number" class="form-input" id="avg_cost" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">幣別</label>
+                    <select class="form-input" id="currency">
+                        <option value="USD">USD 美元</option>
+                        <option value="TWD">TWD 台幣</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    確認新增
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>🤖 AI 財務助手 | 資料來源: Yahoo Finance | 更新時間: {{ now.strftime('%Y-%m-%d %H:%M') }}</p>
+        <p style="margin-top: 0.5rem;">⚠️ 本系統僅供參考，不構成投資建議</p>
+    </footer>
+
+    <script>
+        function openAddModal() {
+            document.getElementById('addModal').classList.add('active');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('active');
+        }
+
+        async function addHolding(event) {
+            event.preventDefault();
+
+            const data = {
+                symbol: document.getElementById('symbol').value.toUpperCase(),
+                shares: document.getElementById('shares').value,
+                avg_cost: document.getElementById('avg_cost').value,
+                currency: document.getElementById('currency').value
+            };
+
+            try {
+                const response = await fetch('/api/portfolio', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('新增失敗，請檢查股票代碼是否正確');
+                }
+            } catch (error) {
+                alert('發生錯誤: ' + error.message);
+            }
+        }
+
+        async function deleteHolding(id) {
+            if (!confirm('確定要刪除這筆持股嗎？')) return;
+
+            try {
+                const response = await fetch(`/api/portfolio/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                alert('刪除失敗: ' + error.message);
+            }
+        }
+    </script>
+</body>
+
+</html>

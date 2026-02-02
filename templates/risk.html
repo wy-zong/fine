@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>風險分析 - AI 財務助手</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">🤖 AI 財務助手</div>
+            <ul class="nav-links">
+                <li><a href="/">📊 儀表板</a></li>
+                <li><a href="/analysis">📈 技術分析</a></li>
+                <li><a href="/portfolio">💼 投資組合</a></li>
+                <li><a href="/risk" class="active">⚠️ 風險分析</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 style="margin-bottom: 2rem;">⚠️ 投資組合風險分析</h1>
+
+        {% if risk_analysis.error is defined %}
+        <div class="card" style="text-align: center; padding: 3rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+            <p>{{ risk_analysis.error }}</p>
+            <a href="/portfolio" class="btn btn-primary" style="margin-top: 1rem;">前往新增持股</a>
+        </div>
+        {% else %}
+
+        <!-- 整體風險摘要 -->
+        <section style="margin-bottom: 2rem;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">投資組合總值</div>
+                    <div class="stat-value">${{ "{:,.2f}".format(risk_analysis.portfolio_value) }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">投組 Beta</div>
+                    <div class="stat-value">{{ risk_analysis.portfolio_beta }}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                        {{ '高於市場波動' if risk_analysis.portfolio_beta > 1 else ('接近市場' if risk_analysis.portfolio_beta >
+                        0.8 else '低於市場波動') }}
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">年化波動率</div>
+                    <div class="stat-value">{{ risk_analysis.portfolio_volatility }}%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">風險等級</div>
+                    <div class="stat-value">
+                        <span class="badge badge-{{ risk_analysis.risk_color }}"
+                            style="font-size: 1.25rem; padding: 0.5rem 1rem;">
+                            {{ risk_analysis.risk_level }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 分散度指標 -->
+        <section style="margin-bottom: 2rem;">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📊 分散度分析</h3>
+                </div>
+                <div style="display: flex; align-items: center; gap: 2rem;">
+                    <div style="flex: 1;">
+                        <div style="background: var(--bg-dark); border-radius: 9999px; height: 24px; overflow: hidden;">
+                            <div style="background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444); 
+                                        width: {{ risk_analysis.diversification_score }}%; 
+                                        height: 100%; 
+                                        transition: width 0.5s;"></div>
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 2rem; font-weight: 700;">{{ risk_analysis.diversification_score }}%</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                            分散度分數
+                        </div>
+                    </div>
+                </div>
+                <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    分散度分數越高，表示投資組合風險越分散。建議保持在 60% 以上。
+                </p>
+            </div>
+        </section>
+
+        <!-- 風險建議 -->
+        <section style="margin-bottom: 2rem;">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">💡 風險管理建議</h3>
+                </div>
+                <ul style="list-style: none; padding: 0;">
+                    {% for rec in risk_analysis.recommendations %}
+                    <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border);">
+                        {{ rec }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </section>
+
+        <!-- 個股風險明細 -->
+        <section>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📋 個股風險指標</h3>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>股票</th>
+                                <th>權重</th>
+                                <th>年化波動率</th>
+                                <th>Beta</th>
+                                <th>夏普比率</th>
+                                <th>最大回撤</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stock in risk_analysis.stock_risks %}
+                            <tr>
+                                <td style="font-weight: 600;">{{ stock.symbol }}</td>
+                                <td>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <div
+                                            style="background: var(--bg-dark); border-radius: 4px; width: 60px; height: 8px; overflow: hidden;">
+                                            <div
+                                                style="background: var(--primary); width: {{ stock.weight }}%; height: 100%;">
+                                            </div>
+                                        </div>
+                                        <span>{{ stock.weight }}%</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span
+                                        class="badge {{ 'badge-danger' if stock.volatility > 30 else ('badge-warning' if stock.volatility > 20 else 'badge-success') }}">
+                                        {{ stock.volatility }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <span
+                                        class="badge {{ 'badge-danger' if stock.beta > 1.5 else ('badge-warning' if stock.beta > 1 else 'badge-success') }}">
+                                        {{ stock.beta }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span
+                                        class="badge {{ 'badge-success' if stock.sharpe > 1 else ('badge-warning' if stock.sharpe > 0 else 'badge-danger') }}">
+                                        {{ stock.sharpe }}
+                                    </span>
+                                </td>
+                                <td style="color: var(--danger);">
+                                    {{ stock.max_drawdown }}%
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-dark); border-radius: 10px;">
+                    <h4 style="margin-bottom: 0.75rem; font-size: 0.875rem;">📖 指標說明</h4>
+                    <div
+                        style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+                        <div><strong>波動率</strong>：衡量股價的變動程度，越高風險越大</div>
+                        <div><strong>Beta</strong>：相對於市場的波動，>1 表示波動大於市場</div>
+                        <div><strong>夏普比率</strong>：風險調整後報酬，>1 為良好，>2 為優秀</div>
+                        <div><strong>最大回撤</strong>：從高點下跌的最大幅度</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+    </div>
+
+    <footer class="footer">
+        <p>🤖 AI 財務助手 | 資料來源: Yahoo Finance</p>
+        <p style="margin-top: 0.5rem;">⚠️ 本系統僅供參考，不構成投資建議</p>
+    </footer>
+</body>
+
+</html>

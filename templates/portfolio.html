@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投資組合 - AI 財務助手</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">🤖 AI 財務助手</div>
+            <ul class="nav-links">
+                <li><a href="/">📊 儀表板</a></li>
+                <li><a href="/analysis">📈 技術分析</a></li>
+                <li><a href="/portfolio" class="active">💼 投資組合</a></li>
+                <li><a href="/risk">⚠️ 風險分析</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="grid grid-2" style="gap: 2rem;">
+            <!-- 持股管理 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">💼 我的持股</h3>
+                    <button class="btn btn-primary btn-sm" onclick="openAddModal()">➕ 新增</button>
+                </div>
+
+                {% if holdings %}
+                <div style="max-height: 400px; overflow-y: auto;">
+                    {% for holding in holdings %}
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border);">
+                        <div>
+                            <div style="font-weight: 600;">{{ holding.symbol }}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                                {{ holding.shares }} 股 @ ${{ "{:,.2f}".format(holding.avg_cost) }}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <a href="/analysis?symbol={{ holding.symbol }}" class="btn btn-outline btn-sm">分析</a>
+                            <button class="btn btn-danger btn-sm" onclick="deleteHolding({{ holding.id }})">×</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    <p>尚無持股</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 追蹤清單 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">👀 追蹤清單</h3>
+                    <button class="btn btn-primary btn-sm" onclick="openWatchlistModal()">➕ 新增</button>
+                </div>
+
+                <div id="watchlist" style="max-height: 400px; overflow-y: auto;">
+                    載入中...
+                </div>
+            </div>
+        </div>
+
+        <!-- 交易記錄 -->
+        <section style="margin-top: 2rem;">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📝 最近交易記錄</h3>
+                </div>
+
+                {% if transactions %}
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>股票</th>
+                                <th>類型</th>
+                                <th>股數</th>
+                                <th>價格</th>
+                                <th>總額</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tx in transactions %}
+                            <tr>
+                                <td>{{ tx.transaction_date[:10] }}</td>
+                                <td>{{ tx.symbol }}</td>
+                                <td>
+                                    <span class="badge {{ 'badge-success' if tx.type == 'BUY' else 'badge-danger' }}">
+                                        {{ '買入' if tx.type == 'BUY' else '賣出' }}
+                                    </span>
+                                </td>
+                                <td>{{ "{:,.2f}".format(tx.shares) }}</td>
+                                <td>${{ "{:,.2f}".format(tx.price) }}</td>
+                                <td>${{ "{:,.2f}".format(tx.total) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    尚無交易記錄
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- 快速操作 -->
+        <section style="margin-top: 2rem;">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">⚡ 快速操作</h3>
+                </div>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="generateReport()">
+                        📊 生成每日報告
+                    </button>
+                    <button class="btn btn-outline" onclick="getRecommendations()">
+                        🤖 取得 AI 建議
+                    </button>
+                </div>
+                <div id="quickResult" style="margin-top: 1rem;"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 新增持股 Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>➕ 新增持股</h3>
+                <button class="modal-close" onclick="closeAddModal()">&times;</button>
+            </div>
+            <form onsubmit="addHolding(event)">
+                <div class="form-group">
+                    <label class="form-label">股票代碼</label>
+                    <input type="text" class="form-input" id="symbol" placeholder="例如: AAPL 或 2330.TW" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">股數</label>
+                    <input type="number" class="form-input" id="shares" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">平均成本</label>
+                    <input type="number" class="form-input" id="avg_cost" step="0.01" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">確認新增</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 新增追蹤 Modal -->
+    <div class="modal" id="watchlistModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>👀 新增追蹤</h3>
+                <button class="modal-close" onclick="closeWatchlistModal()">&times;</button>
+            </div>
+            <form onsubmit="addToWatchlist(event)">
+                <div class="form-group">
+                    <label class="form-label">股票代碼</label>
+                    <input type="text" class="form-input" id="watchSymbol" placeholder="例如: NVDA 或 2454.TW" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">確認新增</button>
+            </form>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>🤖 AI 財務助手 | 資料來源: Yahoo Finance</p>
+    </footer>
+
+    <script>
+        // 載入追蹤清單
+        async function loadWatchlist() {
+            const response = await fetch('/api/watchlist');
+            const items = await response.json();
+            const container = document.getElementById('watchlist');
+
+            if (items.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">尚無追蹤股票</div>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border);">
+                    <div>
+                        <div style="font-weight: 600;">${item.symbol}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${item.name || ''}</div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <a href="/analysis?symbol=${item.symbol}" class="btn btn-outline btn-sm">分析</a>
+                        <button class="btn btn-danger btn-sm" onclick="removeFromWatchlist('${item.symbol}')">×</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Modal 控制
+        function openAddModal() { document.getElementById('addModal').classList.add('active'); }
+        function closeAddModal() { document.getElementById('addModal').classList.remove('active'); }
+        function openWatchlistModal() { document.getElementById('watchlistModal').classList.add('active'); }
+        function closeWatchlistModal() { document.getElementById('watchlistModal').classList.remove('active'); }
+
+        // 新增持股
+        async function addHolding(event) {
+            event.preventDefault();
+            const data = {
+                symbol: document.getElementById('symbol').value.toUpperCase(),
+                shares: document.getElementById('shares').value,
+                avg_cost: document.getElementById('avg_cost').value
+            };
+            await fetch('/api/portfolio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            window.location.reload();
+        }
+
+        // 刪除持股
+        async function deleteHolding(id) {
+            if (!confirm('確定刪除？')) return;
+            await fetch(`/api/portfolio/${id}`, { method: 'DELETE' });
+            window.location.reload();
+        }
+
+        // 新增追蹤
+        async function addToWatchlist(event) {
+            event.preventDefault();
+            const symbol = document.getElementById('watchSymbol').value.toUpperCase();
+            await fetch('/api/watchlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol })
+            });
+            closeWatchlistModal();
+            loadWatchlist();
+        }
+
+        // 移除追蹤
+        async function removeFromWatchlist(symbol) {
+            await fetch(`/api/watchlist/${symbol}`, { method: 'DELETE' });
+            loadWatchlist();
+        }
+
+        // 生成報告
+        async function generateReport() {
+            const result = document.getElementById('quickResult');
+            result.innerHTML = '<div class="loading"></div> 生成中...';
+
+            const response = await fetch('/api/report/generate');
+            const report = await response.json();
+
+            result.innerHTML = `
+                <div class="alert" style="background: var(--bg-dark); border: 1px solid var(--border);">
+                    <p><strong>✅ 報告已生成</strong></p>
+                    <p>投組市值: $${report.portfolio_summary.total_value.toLocaleString()}</p>
+                    <p>總報酬: ${report.portfolio_summary.total_return_pct.toFixed(2)}%</p>
+                </div>
+            `;
+        }
+
+        // 取得建議
+        async function getRecommendations() {
+            const result = document.getElementById('quickResult');
+            result.innerHTML = '<div class="loading"></div> 分析中...';
+
+            const response = await fetch('/api/recommendations');
+            const recs = await response.json();
+
+            result.innerHTML = `
+                <div style="display: grid; gap: 0.5rem;">
+                    ${recs.map(r => `
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: var(--bg-dark); border-radius: 8px;">
+                            <span>${r.symbol}</span>
+                            <span class="badge ${r.recommendation === 'BUY' ? 'badge-success' : (r.recommendation === 'SELL' ? 'badge-danger' : 'badge-warning')}">
+                                ${r.recommendation_zh}
+                            </span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // 初始化
+        loadWatchlist();
+    </script>
+</body>
+
+</html>

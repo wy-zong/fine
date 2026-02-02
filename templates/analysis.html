@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>技術分析 - AI 財務助手</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">🤖 AI 財務助手</div>
+            <ul class="nav-links">
+                <li><a href="/">📊 儀表板</a></li>
+                <li><a href="/analysis" class="active">📈 技術分析</a></li>
+                <li><a href="/portfolio">💼 投資組合</a></li>
+                <li><a href="/risk">⚠️ 風險分析</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 股票選擇 -->
+        <section style="margin-bottom: 2rem;">
+            <div class="card">
+                <form method="GET" action="/analysis" style="display: flex; gap: 1rem; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label class="form-label">股票代碼</label>
+                        <input type="text" name="symbol" class="form-input" value="{{ symbol }}"
+                            placeholder="例如: AAPL 或 2330.TW">
+                    </div>
+                    <button type="submit" class="btn btn-primary">🔍 分析</button>
+                </form>
+
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <span style="color: var(--text-secondary); font-size: 0.875rem;">快速選擇:</span>
+                    {% for stock in default_stocks %}
+                    <a href="/analysis?symbol={{ stock }}"
+                        class="btn btn-outline btn-sm {{ 'btn-primary' if stock == symbol else '' }}">
+                        {{ stock }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-2" style="gap: 2rem;">
+            <!-- 左側：AI 建議 -->
+            <div>
+                <div class="card recommendation-card">
+                    {% if recommendation.error is not defined %}
+                    <h3 style="margin-bottom: 1rem;">{{ recommendation.name }}</h3>
+                    <div style="font-size: 1.5rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                        {{ recommendation.currency }} {{ "{:,.2f}".format(recommendation.current_price) }}
+                    </div>
+
+                    <div class="recommendation-badge {{ recommendation.recommendation.lower() }}">
+                        {{ recommendation.recommendation_zh }}
+                    </div>
+
+                    <div class="confidence" style="margin-top: 1rem;">
+                        信心度: <strong>{{ recommendation.confidence }}%</strong>
+                    </div>
+
+                    <div style="margin-top: 1.5rem; text-align: left;">
+                        <h4 style="margin-bottom: 0.5rem;">📋 分析理由</h4>
+                        <ul class="reasons-list">
+                            {% for reason in recommendation.reasons %}
+                            <li>{{ reason }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        {{ recommendation.disclaimer }}
+                    </div>
+                    {% else %}
+                    <div style="color: var(--danger);">
+                        ❌ 分析失敗: {{ recommendation.error }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 右側：技術指標 -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📊 技術指標</h3>
+                    </div>
+
+                    {% if recommendation.technical_analysis is defined %}
+                    {% set ta = recommendation.technical_analysis %}
+                    <div class="indicator-grid">
+                        <div class="indicator-item">
+                            <div class="indicator-label">RSI (14)</div>
+                            <div class="indicator-value"
+                                style="color: 
+                                {{ 'var(--danger)' if ta.rsi > 70 else ('var(--success)' if ta.rsi < 30 else 'var(--text-primary)') }}">
+                                {{ ta.rsi }}
+                            </div>
+                            <span
+                                class="badge {{ 'badge-danger' if ta.rsi_status == 'overbought' else ('badge-success' if ta.rsi_status == 'oversold' else 'badge-primary') }}">
+                                {{ '超買' if ta.rsi_status == 'overbought' else ('超賣' if ta.rsi_status == 'oversold' else
+                                '中性') }}
+                            </span>
+                        </div>
+
+                        <div class="indicator-item">
+                            <div class="indicator-label">MACD</div>
+                            <div class="indicator-value">{{ ta.macd }}</div>
+                            <span
+                                class="badge {{ 'badge-success' if ta.macd_status == 'bullish' else 'badge-danger' }}">
+                                {{ '多頭' if ta.macd_status == 'bullish' else '空頭' }}
+                            </span>
+                        </div>
+
+                        <div class="indicator-item">
+                            <div class="indicator-label">MA{{ 20 }}</div>
+                            <div class="indicator-value">{{ ta.ma_short }}</div>
+                        </div>
+
+                        <div class="indicator-item">
+                            <div class="indicator-label">MA{{ 60 }}</div>
+                            <div class="indicator-value">{{ ta.ma_long }}</div>
+                        </div>
+
+                        <div class="indicator-item">
+                            <div class="indicator-label">布林上軌</div>
+                            <div class="indicator-value">{{ ta.bb_upper }}</div>
+                        </div>
+
+                        <div class="indicator-item">
+                            <div class="indicator-label">布林下軌</div>
+                            <div class="indicator-value">{{ ta.bb_lower }}</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-dark); border-radius: 10px;">
+                        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">整體趨勢
+                        </div>
+                        <span
+                            class="badge {{ 'badge-success' if ta.trend == 'bullish' else ('badge-danger' if ta.trend == 'bearish' else 'badge-warning') }}"
+                            style="font-size: 1rem; padding: 0.5rem 1rem;">
+                            {{ '📈 多頭趨勢' if ta.trend == 'bullish' else ('📉 空頭趨勢' if ta.trend == 'bearish' else '➖ 盤整')
+                            }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- K線圖 -->
+        <section style="margin-top: 2rem;">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📈 價格走勢圖 (6個月)</h3>
+                </div>
+                <div id="priceChart" class="chart-container"></div>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <p>🤖 AI 財務助手 | 資料來源: Yahoo Finance</p>
+        <p style="margin-top: 0.5rem;">⚠️ 本系統僅供參考，不構成投資建議</p>
+    </footer>
+
+    <script>
+        // 繪製 K 線圖
+        const chartData = {{ chart_data | safe }};
+
+        if (chartData.length > 0) {
+            const trace = {
+                x: chartData.map(d => d.date),
+                close: chartData.map(d => d.close),
+                high: chartData.map(d => d.high),
+                low: chartData.map(d => d.low),
+                open: chartData.map(d => d.open),
+                type: 'candlestick',
+                increasing: { line: { color: '#10b981' } },
+                decreasing: { line: { color: '#ef4444' } }
+            };
+
+            const layout = {
+                paper_bgcolor: '#1e293b',
+                plot_bgcolor: '#1e293b',
+                font: { color: '#f8fafc' },
+                xaxis: {
+                    gridcolor: '#334155',
+                    rangeslider: { visible: false }
+                },
+                yaxis: {
+                    gridcolor: '#334155',
+                    title: '價格'
+                },
+                margin: { t: 20, r: 40, b: 40, l: 60 }
+            };
+
+            Plotly.newPlot('priceChart', [trace], layout, { responsive: true });
+        }
+    </script>
+</body>
+
+</html>
