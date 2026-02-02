@@ -1,0 +1,15 @@
+{
+  "name": "AI 財務助手",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "pip install -r requirements.txt",
+  "forwardPorts": [5000],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  },
+  "postStartCommand": "echo '✅ 環境準備完成！執行 python app.py 啟動應用'"
+}
